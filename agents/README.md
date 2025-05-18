@@ -11,5 +11,6 @@ The project focuses on understanding the sentiment of users with mental health d
 -``` python questionnaire.py```
 
 ### For the execution of the crew (CoPilot):
-- From the crew_format folder 
+- From the crew_format folder
+- Execute this way ```cd crew_format```
 -``` python main.py```
