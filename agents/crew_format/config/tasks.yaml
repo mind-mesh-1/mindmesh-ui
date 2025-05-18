@@ -4,7 +4,6 @@ observe_task:
     Observe the {text} how long they have been occuring with respect to {days}
   expected_output: >
     Provide the analysis of the {text}
-  output_json: MentalH
   agent: observe_a
 
 sentiment_task:
