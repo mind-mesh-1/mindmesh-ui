@@ -1,4 +1,13 @@
 from langchain_core.prompts import ChatPromptTemplate
+from langchain import hub
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain.tools import tool
+import dotenv
+import os
+from langchain_openai import ChatOpenAI
+from openai import OpenAI
+import json
+
 ph9_q=["Over the last two weeks, how often have you been bothered by little interest or pleasure in doing things? (0 = Not at all, 1 = Several days, 2 = More than half the days, 3 = Nearly every day): ",
         "Over the last two weeks, how often have you been bothered by feeling down, depressed, or hopeless? (0 = Not at all, 1 = Several days, 2 = More than half the days, 3 = Nearly every day): ",
         "Over the last two weeks, how often have you been bothered by trouble falling or staying asleep, or sleeping too much? (0 = Not at all, 1 = Several days, 2 = More than half the days, 3 = Nearly every day): ",
@@ -22,11 +31,23 @@ for i, q in enumerate(ph9_q):
                 print("Please enter a number between 0 and 3")
         except ValueError:
             print("Invalid number")
-                
-score=sum(responses.values())
-suicidal_score = responses.get("Q9", 0) > 0
 
-def interpret_score(score):
+### React agent
+@tool("PHQ9ScorerTool", return_direct=False)
+def interpret_score(responses:str)->str:
+    """Interprets PH9-Q Questionnaire and evaluates the score, the severity and suicidal thought """
+    phq9_data: Dict[str, int] = json.loads(responses)
+    cleaned_responses = {}
+    for k, v in phq9_data.items():
+        try:
+            cleaned_responses[k] = int(v)
+        except (ValueError, TypeError):
+            print(f"Warning: Non-integer value encountered for {k}. Using 0.")
+            cleaned_responses[k] = 0
+
+    score=sum(cleaned_responses.values())
+    suicidal_score = cleaned_responses.get("Q9", 0) > 0
+
     if 0 <= score <= 4: 
         return "Minimal"
     elif 5 <= score <= 9: 
@@ -40,49 +61,42 @@ def interpret_score(score):
     else:
         return "Invalid"
 
-total_score=interpret_score(score)
+    total_score=interpret_score(score)
 
-llm_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a highly empathetic and professional mental health assistant. Your task is to provide a compassionate and informative summary of a patient's PHQ-9 questionnaire responses, including their total score, severity level, and any indication of suicidal thoughts. Do not provide a diagnosis. Always recommend seeking professional help."),
-    ("human", """The patient has completed the PHQ-9 questionnaire with the following responses:
-Q1 (Little interest): {q1_val}
-Q2 (Feeling down): {q2_val}
-Q3 (Trouble sleeping): {q3_val}
-Q4 (Feeling tired): {q4_val}
-Q5 (Poor appetite): {q5_val}
-Q6 (Feeling bad): {q6_val}
-Q7 (Trouble concentrating): {q7_val}
-Q8 (Being restless): {q8_val}
-Q9 (Suicidal thought): {q9_val}
+    results={
+        "score":score,
+        "total_score":total_score,
+        "suicidal_score":suicidal_score
+    }
+    result_json=json.dumps(results)
+    return result_json
 
-Based on these responses, the calculated total score is {score}, indicating a severity level of {total_score}.
-Suicidal thoughts are {suicidal_score} based on Q9.
-
-Please provide a compassionate summary of these findings and a clear recommendation for seeking professional help.
-"""),
-])
-formatted_prompt = llm_prompt.format_messages(
-    q1_val=responses.get('Q1'),
-    q2_val=responses.get('Q2'),
-    q3_val=responses.get('Q3'),
-    q4_val=responses.get('Q4'),
-    q5_val=responses.get('Q5'),
-    q6_val=responses.get('Q6'),
-    q7_val=responses.get('Q7'),
-    q8_val=responses.get('Q8'),
-    q9_val=responses.get('Q9'),
-    score=score,
-    total_score=total_score,
-    suicidal_score='indicated' if suicidal_score else 'not indicated'
-)
-#dotenv.load_dotenv()
+dotenv.load_dotenv()
 os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
+
+
 client = OpenAI(
     api_key = os.environ.get("OPENAI_API_KEY")
 )
 llm = ChatOpenAI(
     model="gpt-4o-mini", temperature =0.5
 )
-llm_response = llm(formatted_prompt)
-print("\nLLM Analysis:")
-print(llm_response.content)
+prompt=hub.pull("hwchase17/react")
+tools=[interpret_score]
+agent = create_react_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,
+    handle_parsing_errors=True
+)
+pre_collected_responses = json.dumps(responses)
+agent_output = agent_executor.invoke(
+    {
+        "input": f"Please interpret the following PHQ-9 responses: {pre_collected_responses}. "
+                 "Provide a compassionate SOAP note summary of the mental health assessment, "
+                 "including the total score, depression severity, and suicidal ideation indication. "
+                 "Conclude with a clear recommendation for professional help, If its severe, raise an alarm for emergency in case of sucidal thought. End it with a positive note"
+    }
+)
+
