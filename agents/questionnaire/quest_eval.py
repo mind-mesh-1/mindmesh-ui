@@ -9,9 +9,8 @@ from openai import OpenAI
 import json
 
 
-### React agent
 @tool("PHQ9ScorerTool", return_direct=False)
-def interpret_score(responses:str)->str:
+def evaluation_score(responses:str)->str:
     """Interprets PH9-Q Questionnaire and evaluates the score, the severity and suicidal thought """
     phq9_data: Dict[str, int] = json.loads(responses)
     cleaned_responses = {}
@@ -25,18 +24,19 @@ def interpret_score(responses:str)->str:
     score=sum(cleaned_responses.values())
     suicidal_score = cleaned_responses.get("Q9", 0) > 0
 
-    if 0 <= score <= 4: 
-        return "Minimal"
-    elif 5 <= score <= 9: 
-        return "Mild"
-    elif 10 <= score <= 14: 
-        return "Moderate"
-    elif 15 <= score <= 19: 
-        return "Moderately Severe"
-    elif 20 <= score <= 27: 
-        return "Severe"
-    else:
-        return "Invalid"
+    def interpret_score(score):
+        if 0 <= score <= 4: 
+            return "Minimal"
+        elif 5 <= score <= 9: 
+            return "Mild"
+        elif 10 <= score <= 14: 
+            return "Moderate"
+        elif 15 <= score <= 19: 
+            return "Moderately Severe"
+        elif 20 <= score <= 27: 
+            return "Severe"
+        else:
+            return "Invalid"
 
     total_score=interpret_score(score)
 
@@ -48,6 +48,7 @@ def interpret_score(responses:str)->str:
     result_json=json.dumps(results)
     return result_json
 
+
 dotenv.load_dotenv()
 os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
 
@@ -56,10 +57,10 @@ client = OpenAI(
     api_key = os.environ.get("OPENAI_API_KEY")
 )
 llm = ChatOpenAI(
-    model="gpt-4o-mini", temperature =0.5
+    model="gpt-4o-mini", temperature =0.2
 )
 prompt=hub.pull("hwchase17/react")
-tools=[interpret_score]
+tools=[evaluation_score]
 agent = create_react_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(
     agent=agent,
