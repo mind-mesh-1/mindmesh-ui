@@ -52,29 +52,29 @@ def evaluation_score(responses:str)->str:
 dotenv.load_dotenv()
 os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
 
-
-client = OpenAI(
-    api_key = os.environ.get("OPENAI_API_KEY")
-)
-llm = ChatOpenAI(
+def run(responses):
+    llm = ChatOpenAI(
     model="gpt-4o-mini", temperature =0.2
-)
-prompt=hub.pull("hwchase17/react")
-tools=[evaluation_score]
-agent = create_react_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    handle_parsing_errors=True
-)
-pre_collected_responses = json.dumps(responses)
-agent_output = agent_executor.invoke(
-    {
-        "input": f"Please interpret the following PHQ-9 responses: {pre_collected_responses}. "
-                 "Provide a compassionate SOAP note summary of the mental health assessment, "
-                 "including the total score, depression severity, and suicidal ideation indication. "
-                 "Conclude with a clear recommendation for professional help, If its severe, raise an alarm for emergency in case of sucidal thought. End it with a positive note"
-    }
-)
+    )
+    
+    prompt=hub.pull("hwchase17/react")
+    tools=[evaluation_score]
+    agent = create_react_agent(llm, tools, prompt)
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True,
+        handle_parsing_errors=True
+    )
+    pre_collected_responses = json.dumps(responses)
+    agent_output = agent_executor.invoke(
+        {
+            "input": f"Please interpret the following PHQ-9 responses: {pre_collected_responses}. "
+                    "Provide a compassionate SOAP note summary of the mental health assessment, "
+                     "including the total score, depression severity, and suicidal ideation indication. "
+                    "Conclude with a clear recommendation for professional help, If its severe, raise an alarm for emergency in case of sucidal thought. End it with a positive note"
+        }
+    )
+
+run(responses)
 
