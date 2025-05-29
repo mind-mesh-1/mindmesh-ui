@@ -69,12 +69,16 @@ def run(responses):
     pre_collected_responses = json.dumps(responses)
     agent_output = agent_executor.invoke(
         {
-            "input": f"Please interpret the following PHQ-9 responses: {pre_collected_responses}. "
-                    "Provide a compassionate SOAP note summary of the mental health assessment, "
+            "input": f"Please interpret the following PHQ-9 responses: {pre_collected_responses}."
+                     "You're Mental Health Assistant to check if the patient is suffering from depression"
+                     "Provide a compassionate note summary of the mental health assessment, "
                      "including the total score, depression severity, and suicidal ideation indication. "
-                    "Conclude with a clear recommendation for professional help, If its severe, raise an alarm for emergency in case of sucidal thought. End it with a positive note"
+                     "If the suicidal ideation is higher and let the patient know immediately"
+                     "Conclude with a clear recommendation for professional help, If its severe, raise an alarm for emergency in case of sucidal thought. End it with a positive note"
         }
     )
-
+    print(agent_output['output'])
+    return agent_output['output']
 run(responses)
+
 
